@@ -9,7 +9,11 @@
  * Redistributions of files must retain the above copyright notice.
  */
 
-class MODXRevolutionValetDriver extends BasicValetDriver
+namespace Valet\Drivers\Custom;
+
+use Valet\Drivers\ValetDriver;
+
+class MODXRevolutionValetDriver extends ValetDriver
 {
     /**
      * @var string
@@ -28,11 +32,16 @@ class MODXRevolutionValetDriver extends BasicValetDriver
      * @param  string $uri
      * @return bool
      */
-    public function serves($sitePath, $siteName, $uri)
+    public function serves(string $sitePath, string $siteName, string $uri): bool
     {
-        $path = dirname($uri);
-        if ($path !== '/') {
-            $path .= '/';
+        if (str_contains($uri, '/manager/')) {
+            $this->basePath = '/manager/';
+            return true;
+        } else {
+            $path = dirname($uri);
+            if ($path !== '/') {
+                $path .= '/';
+            }
         }
 
         if ($this->isMODXRequest($sitePath, $path)) {
@@ -51,25 +60,28 @@ class MODXRevolutionValetDriver extends BasicValetDriver
      * @param  string $uri
      * @return string|false
      */
-    public function isStaticFile($sitePath, $siteName, $uri)
+    public function isStaticFile(string $sitePath, string $siteName, string $uri)
     {
-        $isStaticFile = parent::isStaticFile($sitePath, $siteName, $uri);
+        $staticFilePath = $sitePath.$uri;
 
-        if ($isStaticFile === false) {
-            $uriParts = explode('/', ltrim($uri, '/'), 2);
+        if (file_exists($staticFilePath) && is_file($staticFilePath)) {
+            return $staticFilePath;
+        }
 
-            // Check if the URI contains a possible cultureKey we have to set.
-            if (count($uriParts) === 2) {
-                $uriCultureKeyPart = $uriParts[0];
-                if (in_array($uriCultureKeyPart, $this->_getAvailableCultureKeys())) {
-                    $uriPart = '/' . $uriParts[1];
+        // Check if the URI contains a possible cultureKey we have to set.
+        $uriParts = explode('/', ltrim($uri, '/'), 2);
+        if (count($uriParts) === 2) {
+            $uriCultureKeyPart = $uriParts[0];
+            if (in_array($uriCultureKeyPart, $this->_getAvailableCultureKeys())) {
+                $uriPart = '/' . $uriParts[1];
 
-                    return parent::isStaticFile($sitePath, $siteName, $uriPart);
+                if (file_exists($staticFilePath = $sitePath.$uriPart)) {
+                    return $staticFilePath;
                 }
             }
         }
 
-        return $isStaticFile;
+        return false;
     }
 
     /**
@@ -80,8 +92,10 @@ class MODXRevolutionValetDriver extends BasicValetDriver
      * @param  string $uri
      * @return string
      */
-    public function frontControllerPath($sitePath, $siteName, $uri)
+    public function frontControllerPath(string $sitePath, string $siteName, string $uri): string
     {
+        $_SERVER['DOCUMENT_ROOT'] = '/';
+        
         if ($_SERVER['REQUEST_METHOD'] === 'GET' || $_SERVER['REQUEST_METHOD'] === 'POST') {
             $requestParameter = preg_replace('/' .preg_quote($this->basePath, '/'). '/', '', $uri, 1);
             $requestParameter = ltrim($requestParameter, '/');
@@ -116,12 +130,14 @@ class MODXRevolutionValetDriver extends BasicValetDriver
                 }
             }
         }
-
-        if ($this->basePath !== '/') {
-            return parent::frontControllerPath($sitePath . $this->basePath, $siteName, preg_replace('/' .preg_quote($this->basePath, '/'). '/', '', $uri, 1));
+        if (str_contains($uri, '.php')) {
+            return $sitePath.$uri;
+        }
+        if ($uri !== '/') {
+            return $sitePath.$this->basePath.'index.php';
         }
 
-        return parent::frontControllerPath($sitePath, $siteName, $uri);
+        return $sitePath.'/index.php';
     }
 
     /**
