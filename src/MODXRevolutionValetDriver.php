@@ -34,7 +34,7 @@ class MODXRevolutionValetDriver extends ValetDriver
      */
     public function serves(string $sitePath, string $siteName, string $uri): bool
     {
-        if (str_contains($uri, '/manager/')) {
+        if (str_contains($uri, '/manager')) {
             $this->basePath = '/manager/';
             return true;
         } else {
